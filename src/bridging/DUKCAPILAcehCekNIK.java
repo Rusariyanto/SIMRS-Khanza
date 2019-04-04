@@ -7,6 +7,8 @@ package bridging;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import fungsi.sekuel;
+import fungsi.var;
 import java.io.FileInputStream;
 import java.util.Properties;
 import javax.swing.JOptionPane;
@@ -24,20 +26,30 @@ public class DUKCAPILAcehCekNIK {
     public String EKTP_STATUS="",NO_KK="",NIK="",NAMA_LGKP="",KAB_NAME="",AGAMA="",
             NO_RW="",KEC_NAME="",JENIS_PKRJN="",NO_RT="",NO_KEL="",ALAMAT="",NO_KEC="",
             TMPT_LHR="",PDDK_AKH="",STATUS_KAWIN="",NO_PROP="",NAMA_LGKP_IBU="",
-            PROP_NAME="",NO_KAB="",KEL_NAME="",JENIS_KLMIN="",TGL_LHR="",
+            PROP_NAME="",NO_KAB="",KEL_NAME="",JENIS_KLMIN="",TGL_LHR="",GOL_DARAH="",
             requestJson="",stringbalik="";
     private final Properties prop = new Properties();
-    
+    private sekuel Sequel=new sekuel();
+    private String URL;
+    private HttpHeaders headers;
+    private HttpEntity requestEntity;
+    private RestTemplate rest = new RestTemplate();	            
+    private ObjectMapper mapper = new ObjectMapper();
+    private JsonNode root;
+    private JsonNode nameNode;
     public DUKCAPILAcehCekNIK(){
         super();
+        try {
+            prop.loadFromXML(new FileInputStream("setting/database.xml"));
+            URL = prop.getProperty("URLDUKCAPILACEH")+"/CALL_NIK";
+        } catch (Exception e) {
+            System.out.println("Notif : "+e);
+        }
     }
     
     public void tampil(String nik) {
         try {
-            prop.loadFromXML(new FileInputStream("setting/database.xml"));
-            String URL = prop.getProperty("URLDUKCAPILACEH")+"/CALL_NIK";	
-
-	    HttpHeaders headers = new HttpHeaders();
+	    headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 	    headers.add("Accept","application/json");
             requestJson="{"+
@@ -47,14 +59,11 @@ public class DUKCAPILAcehCekNIK {
                             "\"IP_USER\":\""+prop.getProperty("IPUSERDUKCAPILACEH")+"\"" +
                             "}"; 
             //System.out.println("JSON dikirim : "+requestJson);
-	    HttpEntity requestEntity = new HttpEntity(requestJson,headers);
-	    RestTemplate rest = new RestTemplate();	
-            
-            ObjectMapper mapper = new ObjectMapper();
+	    requestEntity = new HttpEntity(requestJson,headers);	    
             stringbalik=rest.exchange(URL, HttpMethod.POST, requestEntity, String.class).getBody();
             //System.out.println("string balik : "+stringbalik);
-            JsonNode root = mapper.readTree(stringbalik);
-            JsonNode nameNode = root.path("content");
+            root = mapper.readTree(stringbalik);
+            nameNode = root.path("content");
             if(nameNode.isArray()){
                 for(JsonNode list:nameNode){                    
                     try {
@@ -92,6 +101,8 @@ public class DUKCAPILAcehCekNIK {
                             KEL_NAME=list.path("KEL_NAME").asText();
                             JENIS_KLMIN=list.path("JENIS_KLMIN").asText();
                             TGL_LHR=list.path("TGL_LHR").asText();
+                            GOL_DARAH=list.path("GOL_DARAH").asText();
+                            Sequel.queryu2("insert into log_dukcapil_aceh values('"+NIK+"',now(),'"+var.getkode()+"')");
                         }
                     } catch (Exception e) {
                         JOptionPane.showMessageDialog(null,e+" "+list.path("RESPON").asText());
@@ -100,6 +111,9 @@ public class DUKCAPILAcehCekNIK {
             }
         } catch (Exception ex) {
             System.out.println("Notifikasi : "+ex);
+            if(ex.toString().contains("UnknownHostException")){
+                JOptionPane.showMessageDialog(null,"Koneksi ke server Dukcapil terputus...!");
+            }
         }
     }
     
